@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, BadgeCheck, Bot, FileCheck2, Lock, Mail, ShieldCheck, Sparkles, Zap } from 'lucide-react';
+import { api } from '@/lib/api';
+import { ago, titleCase } from '@/lib/format';
+import type { PublicSummary } from '@/lib/types';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -8,11 +12,9 @@ import { Input, Label } from '@/components/ui/input';
 import { Wordmark } from '@/components/logo';
 import { ServerBanner } from '@/components/layout/AppLayout';
 
-const feed = [
-  { icon: FileCheck2, tone: 'text-success bg-success/15', t: 'Discharge summary verified', d: 'CLM-1009 · confidence 94%' },
-  { icon: Sparkles, tone: 'text-primary bg-primary/15', t: 'Settlement calculated: ₹43,560', d: 'CLM-1001 · 10% co-pay applied' },
-  { icon: Bot, tone: 'text-warning bg-warning/15', t: 'Escalated to a specialist', d: 'CLM-1003 · amount above ₹1,00,000' },
-];
+const feedIcon = (action: string) =>
+  action.includes('VERIF') || action.includes('APPROV') ? { icon: FileCheck2, tone: 'text-success bg-success/15' } : action.includes('ESCALAT') || action.includes('FLAG') ? { icon: Bot, tone: 'text-warning bg-warning/15' } : { icon: Sparkles, tone: 'text-primary bg-primary/15' };
+const secs = (s: number | null) => (s == null ? '—' : s < 60 ? `${s} s` : `${Math.round(s / 60)} min`);
 
 export default function Login() {
   const { user, login } = useAuth();
@@ -22,6 +24,9 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Aggregate-only, unauthenticated numbers from GET /api/public/summary (no fake fallbacks).
+  const pub = useQuery({ queryKey: ['public-summary'], queryFn: () => api<PublicSummary>('/public/summary'), refetchInterval: 60_000 });
+  const feed = pub.data?.recent ?? [];
 
   if (user) return <Navigate to="/" replace />;
 
@@ -62,25 +67,30 @@ export default function Login() {
               Claim Saathi reads every document, checks it against the policy, raises the right query and calculates the payout. Your team only sees the claims that truly need a human.
             </p>
             <div className="mt-9 space-y-3">
-              {feed.map((f, i) => (
-                <div key={i} className="flex items-center gap-3.5 rounded-2xl border border-white/10 bg-white/[0.06] p-3.5 backdrop-blur-sm animate-slide-in" style={{ animationDelay: `${i * 120}ms` }}>
+              {pub.isLoading && [0, 1, 2].map((i) => <div key={i} className="h-[66px] animate-pulse rounded-2xl border border-white/10 bg-white/[0.06]" />)}
+              {pub.error && <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3.5 text-sm text-white/60">Live agent feed unavailable right now.</div>}
+              {feed.map((a, i) => {
+                const f = feedIcon(a.action);
+                return (
+                <div key={a.id} className="flex items-center gap-3.5 rounded-2xl border border-white/10 bg-white/[0.06] p-3.5 backdrop-blur-sm animate-slide-in" style={{ animationDelay: `${i * 120}ms` }}>
                   <div className={`grid size-9 place-items-center rounded-xl ${f.tone}`}>
                     <f.icon className="size-[18px]" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-white">{f.t}</div>
-                    <div className="text-xs text-white/55">{f.d}</div>
+                    <div className="text-sm font-medium text-white">{titleCase(a.action)}</div>
+                    <div className="text-xs text-white/55">{[a.claimNumber, a.confidence != null ? `confidence ${Math.round(a.confidence * 100)}%` : null, ago(a.createdAt)].filter(Boolean).join(' · ')}</div>
                   </div>
                   <span className="text-[11px] font-medium text-white/40">AI</span>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
           <div className="relative flex items-center gap-8 text-white/60">
             {[
-              ['78%', 'claims auto-handled'],
-              ['< 2 min', 'document checks'],
-              ['100%', 'decisions explained'],
+              [pub.data?.autoHandledPct != null ? `${pub.data.autoHandledPct}%` : '—', 'claims auto-handled'],
+              [secs(pub.data?.medianDocCheckSeconds ?? null), 'median document check'],
+              [pub.data?.explainedPct != null ? `${pub.data.explainedPct}%` : '—', 'AI decisions explained'],
             ].map(([a, b]) => (
               <div key={b}>
                 <div className="text-xl font-semibold text-white">{a}</div>
@@ -125,8 +135,8 @@ export default function Login() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { key: 'ops', email: 'ops@claimsaathi.demo', title: 'Ops team', sub: 'Ishita Rao', icon: BadgeCheck },
-                { key: 'admin', email: 'admin@claimsaathi.demo', title: 'Admin', sub: 'Kabir Shah', icon: ShieldCheck },
+                { key: 'ops', email: 'ops@claimsaathi.demo', title: 'Ops team', sub: 'ops@claimsaathi.demo', icon: BadgeCheck },
+                { key: 'admin', email: 'admin@claimsaathi.demo', title: 'Admin', sub: 'admin@claimsaathi.demo', icon: ShieldCheck },
               ].map((q) => (
                 <button
                   key={q.key}

@@ -19,7 +19,7 @@ function GlobalSearch() {
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLInputElement>(null);
-  const { data } = useQuery({ queryKey: ['search', q], queryFn: () => api<SearchRes>(`/search?q=${encodeURIComponent(q)}`), enabled: q.trim().length >= 2 });
+  const { data } = useQuery({ queryKey: ['search', q], queryFn: () => api<SearchRes>(`/search?q=${encodeURIComponent(q)}`), enabled: q.trim().length >= 2, refetchInterval: false });
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -85,7 +85,7 @@ const notifDot: Record<Notification['type'], string> = { INFO: 'bg-primary', SUC
 function Notifications() {
   const qc = useQueryClient();
   const nav = useNavigate();
-  const { data } = useQuery({ queryKey: ['notifications'], queryFn: () => api<{ items: Notification[]; unread: number }>('/notifications/my'), refetchInterval: 20000 });
+  const { data, isLoading, error } = useQuery({ queryKey: ['notifications'], queryFn: () => api<{ items: Notification[]; unread: number }>('/notifications/my') });
   const readAll = useMutation({ mutationFn: () => api('/notifications/read-all', { method: 'POST' }), onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }) });
   const readOne = (n: Notification) => {
     if (!n.read) api(`/notifications/${n.id}/read`, { method: 'PATCH' }).then(() => qc.invalidateQueries({ queryKey: ['notifications'] }));
@@ -105,7 +105,9 @@ function Notifications() {
           </button>
         </div>
         <div className="max-h-96 overflow-y-auto p-1.5 scrollbar-thin">
-          {!data?.items.length && <div className="py-10 text-center text-sm text-muted">You're all caught up</div>}
+          {isLoading && <div className="py-10 text-center text-sm text-muted">Loading…</div>}
+          {error && <div className="py-10 text-center text-sm text-error">Couldn't load notifications</div>}
+          {data && !data.items.length && <div className="py-10 text-center text-sm text-muted">You're all caught up</div>}
           {data?.items.map((n) => (
             <DropdownItem key={n.id} onSelect={() => readOne(n)} className={cn('items-start gap-3 py-2.5', !n.read && 'bg-primary-50/50')}>
               <span className={cn('mt-1.5 size-2 shrink-0 rounded-full', notifDot[n.type])} />
@@ -128,8 +130,8 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
   const { user, logout } = useAuth();
   const qc = useQueryClient();
   const reset = useMutation({
-    mutationFn: () => api('/admin/reset-demo', { method: 'POST' }),
-    onSuccess: () => (qc.invalidateQueries(), toast.success('Demo data reset', { description: 'All 9 demo claims are back to their starting state.' })),
+    mutationFn: () => api<{ claims: number; documents: number; users: number }>('/admin/reset-demo', { method: 'POST' }),
+    onSuccess: (r) => (qc.invalidateQueries(), toast.success('Demo data reset', { description: `${r.claims} claims, ${r.documents} documents and ${r.users} users restored from the seed.` })),
     onError: (e: Error) => toast.error(e.message),
   });
   return (

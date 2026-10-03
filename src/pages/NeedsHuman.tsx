@@ -5,13 +5,13 @@ import { ArrowUpRight, Bot, CheckCircle2, Clock, FileText, HelpCircle, PartyPopp
 import { api } from '@/lib/api';
 import { ago, docLabel, inr } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import type { Escalation } from '@/lib/types';
+import type { AppConfig, Escalation } from '@/lib/types';
 import { PageHeader } from '@/components/layout/AppLayout';
 import { Card } from '@/components/ui/card';
 import { Badge, ConfidencePill, StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { EmptyState } from '@/components/ui/empty';
+import { EmptyState, ErrorState } from '@/components/ui/empty';
 import { Avatar } from '@/components/ui/avatar';
 import { Segmented } from '@/components/ui/tabs';
 import { DecisionDialog, QueryDialog } from '@/components/decision';
@@ -80,18 +80,20 @@ function EscalationCard({ e }: { e: Escalation }) {
 
 export default function NeedsHuman() {
   const [tab, setTab] = useState<'ALL' | 'ESCALATION' | 'PREAUTH'>('ALL');
-  const { data, isLoading } = useQuery({ queryKey: ['escalations'], queryFn: () => api<Escalation[]>('/escalations'), refetchInterval: 10000 });
+  const { data, isLoading, error, refetch } = useQuery({ queryKey: ['escalations'], queryFn: () => api<Escalation[]>('/escalations') });
+  const cfg = useQuery({ queryKey: ['config'], queryFn: () => api<AppConfig>('/config') });
   const rows = (data ?? []).filter((e) => tab === 'ALL' || e.kind === tab);
   return (
     <div className="animate-fade-in">
       <PageHeader
         title="Needs Human"
-        description="Claims the agent didn't decide alone: low confidence, high risk, or above ₹1,00,000. Each has a summary and a suggested decision."
+        description={`Claims the agent didn't decide alone: low confidence, high risk${cfg.data ? `, or above ${inr(cfg.data.escalationAmount)}` : ''}. Each has a summary and a suggested decision.`}
         actions={<Segmented value={tab} onChange={setTab} options={[{ value: 'ALL', label: 'All', count: data?.length }, { value: 'ESCALATION', label: 'Escalated', count: data?.filter((e) => e.kind === 'ESCALATION').length }, { value: 'PREAUTH', label: 'Pre-auth', count: data?.filter((e) => e.kind === 'PREAUTH').length }]} />}
       />
       <div className="space-y-4">
         {isLoading && [0, 1].map((i) => <Skeleton key={i} className="h-64 w-full rounded-2xl" />)}
-        {!isLoading && !rows.length && <Card><EmptyState icon={<PartyPopper />} title="Queue is clear" description="The Claim Agent is handling everything on its own right now." /></Card>}
+        {error && <Card><ErrorState error={error} onRetry={() => refetch()} /></Card>}
+        {!isLoading && !error && !rows.length && <Card><EmptyState icon={<PartyPopper />} title="Queue is clear" description="The Claim Agent is handling everything on its own right now." /></Card>}
         {rows.map((e) => <EscalationCard key={e.id} e={e} />)}
       </div>
     </div>

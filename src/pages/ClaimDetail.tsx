@@ -23,7 +23,7 @@ const suggestionLabel: Record<string, string> = { APPROVE: 'Approve in full', PA
 export default function ClaimDetail() {
   const { id } = useParams();
   const qc = useQueryClient();
-  const { data: c, isLoading, error } = useQuery({ queryKey: ['claim', id], queryFn: () => api<CD>(`/claims/${id}`), refetchInterval: 4000 });
+  const { data: c, isLoading, error } = useQuery({ queryKey: ['claim', id], queryFn: () => api<CD>(`/claims/${id}`) });
   const [dlg, setDlg] = useState<'APPROVE' | 'REJECT' | 'QUERY' | null>(null);
   const [preview, setPreview] = useState<Doc | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -154,6 +154,7 @@ export default function ClaimDetail() {
               </div>
             </div>
             <div className="divide-y divide-line">
+              {!c.documents.length && !c.checklist.missing.length && <p className="px-6 py-5 text-center text-[13px] text-muted">No documents uploaded yet.</p>}
               {c.documents.map((d) => (
                 <div key={d.id} className="flex items-center gap-4 px-6 py-3">
                   <button onClick={() => setPreview(d)} className={cn('grid size-10 shrink-0 place-items-center rounded-xl transition hover:scale-105', d.status === 'VERIFIED' ? 'bg-success-50 text-success' : d.status === 'INVALID' ? 'bg-error-50 text-error' : 'bg-warning-50 text-warning')}>
@@ -219,6 +220,7 @@ export default function ClaimDetail() {
             <CardHeader title="Agent decisions" description="Every action on this claim, with the reason" icon={<Bot />} />
             <div className="max-h-[420px] divide-y divide-line overflow-y-auto border-t border-line scrollbar-thin">
               {c.activities.map((a) => <ActivityRow key={a.id} a={a} />)}
+              {!c.activities.length && <p className="px-6 py-5 text-center text-[13px] text-muted">No agent actions on this claim yet.</p>}
             </div>
           </Card>
         </div>
@@ -228,6 +230,7 @@ export default function ClaimDetail() {
           <Card>
             <CardHeader title="Timeline" description={`Last activity ${ago(c.lastActivityAt)}`} />
             <CardBody>
+              {!c.events.length && <p className="text-center text-[13px] text-muted">No events yet.</p>}
               <ol className="relative">
                 {c.events.map((e, i) => {
                   const last = i === c.events.length - 1;

@@ -12,12 +12,12 @@ import { Badge, StatusBadge } from '@/components/ui/badge';
 import { Segmented } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { TableSkeleton } from '@/components/ui/skeleton';
-import { EmptyState } from '@/components/ui/empty';
+import { EmptyState, ErrorState } from '@/components/ui/empty';
 
 export default function Queries() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<'ALL' | 'OPEN' | 'ANSWERED' | 'CLOSED'>('ALL');
-  const { data, isLoading } = useQuery({ queryKey: ['queries'], queryFn: () => api<Query[]>('/queries'), refetchInterval: 10000 });
+  const { data, isLoading, error, refetch } = useQuery({ queryKey: ['queries'], queryFn: () => api<Query[]>('/queries') });
   const close = useMutation({ mutationFn: (id: string) => api(`/queries/${id}/close`, { method: 'PATCH' }), onSuccess: () => (qc.invalidateQueries(), toast.success('Query closed')) });
   const rows = (data ?? []).filter((q) => tab === 'ALL' || q.status === tab);
   const n = (s: string) => data?.filter((q) => q.status === s).length;
@@ -25,7 +25,7 @@ export default function Queries() {
     <div className="animate-fade-in">
       <PageHeader title="Queries" description="Questions sent to customers. The agent closes them automatically once the right document arrives." actions={<Segmented value={tab} onChange={setTab} options={[{ value: 'ALL', label: 'All', count: data?.length }, { value: 'OPEN', label: 'Open', count: n('OPEN') }, { value: 'ANSWERED', label: 'Answered', count: n('ANSWERED') }, { value: 'CLOSED', label: 'Closed', count: n('CLOSED') }]} />} />
       <Card className="overflow-hidden">
-        {isLoading ? <TableSkeleton /> : !rows.length ? <EmptyState icon={<MessageSquareText />} title="No queries here" description="When a document is missing, the agent raises a query automatically." /> : (
+        {error ? <ErrorState error={error} onRetry={() => refetch()} /> : isLoading ? <TableSkeleton /> : !rows.length ? <EmptyState icon={<MessageSquareText />} title="No queries here" description="When a document is missing, the agent raises a query automatically." /> : (
           <div className="divide-y divide-line">
             {rows.map((q) => (
               <div key={q.id} className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-start">

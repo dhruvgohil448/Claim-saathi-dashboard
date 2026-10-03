@@ -13,12 +13,13 @@ import { Segmented } from '@/components/ui/tabs';
 import { TableSkeleton } from '@/components/ui/skeleton';
 import { Dialog, SheetContent } from '@/components/ui/dialog';
 import { Avatar } from '@/components/ui/avatar';
+import { EmptyState, ErrorState } from '@/components/ui/empty';
 
 export default function Policies() {
   const [sp, setSp] = useSearchParams();
   const [q, setQ] = useState('');
   const [lang, setLang] = useState<'en' | 'hi'>('en');
-  const { data, isLoading } = useQuery({ queryKey: ['policies'], queryFn: () => api<Policy[]>('/policies') });
+  const { data, isLoading, error, refetch } = useQuery({ queryKey: ['policies'], queryFn: () => api<Policy[]>('/policies') });
   const rows = (data ?? []).filter((p) => !q || `${p.policyNumber} ${p.user?.name}`.toLowerCase().includes(q.toLowerCase()));
   const open = data?.find((p) => p.id === sp.get('open'));
   return (
@@ -26,7 +27,7 @@ export default function Policies() {
       <PageHeader title="Policies" description="Policies read by the AI. Rules here drive every coverage check and settlement." />
       <Card className="overflow-hidden">
         <div className="border-b border-line p-4"><Input icon={<Search />} placeholder="Search by policy number or holder" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-md" /></div>
-        {isLoading ? <TableSkeleton /> : (
+        {error ? <ErrorState error={error} onRetry={() => refetch()} /> : isLoading ? <TableSkeleton /> : !rows.length ? <EmptyState icon={<ShieldCheck />} title={data?.length ? 'No policies match' : 'No policies yet'} description={data?.length ? undefined : 'Policies linked from the mobile app appear here.'} /> : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[860px] text-left text-sm">
               <thead><tr className="border-b border-line bg-[#FAFCFE] text-[11px] font-semibold tracking-[0.06em] text-subtle uppercase"><th className="px-6 py-3">Holder</th><th className="px-4 py-3">Policy</th><th className="px-4 py-3 text-right">Sum insured</th><th className="px-4 py-3 text-right">Room cap</th><th className="px-4 py-3">Co-pay</th><th className="px-4 py-3">Since</th><th className="px-6 py-3 text-right">Claims</th></tr></thead>
@@ -62,10 +63,11 @@ export default function Policies() {
               </div>
               <div>
                 <h4 className="mb-2 text-sm font-semibold">Waiting periods</h4>
-                <div className="space-y-1.5">{open.waitingPeriods.map((w) => <div key={w.name} className="flex justify-between rounded-lg bg-canvas px-3 py-2 text-[13px]"><span className="text-muted">{w.name}</span><span className="font-medium">{w.months} months</span></div>)}</div>
+                <div className="space-y-1.5">{!open.waitingPeriods?.length && <p className="text-[13px] text-muted">None recorded.</p>}{(open.waitingPeriods ?? []).map((w) => <div key={w.name} className="flex justify-between rounded-lg bg-canvas px-3 py-2 text-[13px]"><span className="text-muted">{w.name}</span><span className="font-medium">{w.months} months</span></div>)}</div>
               </div>
+              {!!open.members?.length && <div><h4 className="mb-2 text-sm font-semibold">Insured members</h4><div className="space-y-1.5">{open.members.map((m, i) => <div key={i} className="flex justify-between rounded-lg bg-canvas px-3 py-2 text-[13px]"><span className="text-ink">{m.name}</span><span className="text-muted">{m.relation ?? '—'}</span></div>)}</div></div>}
               {open.subLimits && <div><h4 className="mb-2 text-sm font-semibold">Sub-limits</h4><div className="space-y-1.5">{Object.entries(open.subLimits).map(([k, v]) => <div key={k} className="flex justify-between rounded-lg bg-canvas px-3 py-2 text-[13px]"><span className="text-muted">{k.replace(/_/g, ' ')}</span><span className="font-medium">{inr(v)}</span></div>)}</div></div>}
-              <div><h4 className="mb-2 text-sm font-semibold">Exclusions</h4><div className="flex flex-wrap gap-1.5">{open.exclusions.map((e) => <Badge key={e}>{e}</Badge>)}</div></div>
+              <div><h4 className="mb-2 text-sm font-semibold">Exclusions</h4><div className="flex flex-wrap gap-1.5">{!open.exclusions?.length && <p className="text-[13px] text-muted">None recorded.</p>}{(open.exclusions ?? []).map((e) => <Badge key={e}>{e}</Badge>)}</div></div>
             </div>
           </SheetContent>
         )}

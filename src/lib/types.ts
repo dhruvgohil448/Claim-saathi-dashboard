@@ -3,7 +3,8 @@ export type ClaimStatus = 'CREATED' | 'PREAUTH_SUBMITTED' | 'DOCS_PENDING' | 'UN
 export type DocStatus = 'UPLOADED' | 'VERIFIED' | 'NEEDS_REVIEW' | 'INVALID';
 export type Actor = 'AI' | 'HUMAN' | 'SYSTEM';
 
-export interface User { id: string; name: string; email: string; role: Role; phone?: string | null; city?: string | null }
+export interface BankInfo { accountName: string; accountNumberMasked: string; ifsc: string; bankName?: string | null; verified: boolean; verifiedAt?: string | null }
+export interface User { id: string; name: string; email: string; role: Role; phone?: string | null; city?: string | null; dob?: string | null; gender?: string | null; bank?: BankInfo | null; profileComplete?: boolean }
 export interface Deduction { label: string; amount: number; reason: string; clause?: string }
 export interface Settlement { id: string; claimId: string; billAmount: number; deductions: Deduction[]; coPayAmount: number; approvedAmount: number; explanation?: string | null; status: 'ESTIMATED' | 'APPROVED' | 'PAID'; utr?: string | null; paidAt?: string | null }
 export interface Issue { code: string; severity: 'low' | 'medium' | 'high'; message: string }
@@ -26,6 +27,7 @@ export interface BillItem { description: string; qty: number; rate: number; amou
 export interface Policy {
   id: string; userId: string; insurer: string; planName?: string | null; policyNumber: string; sumInsured: number; roomRentLimit: number; icuLimit?: number | null; coPayPercent: number;
   startDate: string; endDate?: string | null; waitingPeriods: { name: string; months: number }[]; subLimits?: Record<string, number> | null; exclusions: string[]; summary?: string | null; summaryHindi?: string | null; createdAt: string;
+  members?: { name: string; relation?: string; dob?: string }[] | null;
   user?: { id: string; name: string; email: string; phone?: string | null }; _count?: { claims: number };
 }
 export interface ClaimListItem {
@@ -55,6 +57,9 @@ export interface Charts {
   deductionsByType: { label: string; amount: number }[];
   documentValidation: Record<string, number>;
   aiActionsByType: { action: string; count: number }[];
+  turnaround: { decidedClaims: number; avgHours: number | null; medianHours: number | null; perDay: { date: string; decided: number; avgHours: number | null }[] };
 }
+export interface AppConfig { escalationAmount: number; autoVerifyConfidence: number; stuckAfterMinutes: number; maxReminders: number; autoSettleAfterMinutes: number; ai: string; planner: string; storage: string; liveClients: number }
+export interface PublicSummary { totalClaims: number; autoHandledPct: number | null; medianDocCheckSeconds: number | null; docChecksMeasured: number; explainedPct: number | null; recent: { id: string; action: string; confidence: number | null; createdAt: string; claimNumber: string | null }[] }
 export interface Notification { id: string; title: string; body: string; type: 'INFO' | 'SUCCESS' | 'WARNING' | 'ACTION_REQUIRED'; read: boolean; createdAt: string; claimId?: string | null; claim?: { claimNumber: string } | null }
-export interface UserRow extends User { createdAt: string; _count: { claims: number; policies: number } }
+export interface UserRow extends Omit<User, 'email'> { email: string | null; createdAt: string; lastLoginAt?: string | null; _count: { claims: number; policies: number } }

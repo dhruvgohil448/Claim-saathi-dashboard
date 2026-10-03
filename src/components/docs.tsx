@@ -8,7 +8,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
 export function DocPreview({ doc, className }: { doc: Doc; className?: string }) {
-  const { data, isLoading } = useQuery({ queryKey: ['doc-url', doc.id], queryFn: () => api<{ url: string; mimeType: string }>(`/documents/${doc.id}/url`), staleTime: 5 * 60_000 });
+  const { data, isLoading } = useQuery({ queryKey: ['doc-url', doc.id], queryFn: () => api<{ url: string; mimeType: string }>(`/documents/${doc.id}/url`), staleTime: 5 * 60_000, refetchInterval: false });
   if (isLoading || !data) return <div className={cn('grid place-items-center rounded-xl bg-canvas', className)}><Loader2 className="size-5 animate-spin text-primary" /></div>;
   const isImg = (data.mimeType || doc.mimeType || '').startsWith('image/');
   return isImg ? (
@@ -19,7 +19,7 @@ export function DocPreview({ doc, className }: { doc: Doc; className?: string })
 }
 
 export function DocPreviewDialog({ doc, onClose }: { doc: Doc | null; onClose: () => void }) {
-  const url = useQuery({ queryKey: ['doc-url', doc?.id], queryFn: () => api<{ url: string }>(`/documents/${doc!.id}/url`), enabled: !!doc });
+  const url = useQuery({ queryKey: ['doc-url', doc?.id], queryFn: () => api<{ url: string }>(`/documents/${doc!.id}/url`), enabled: !!doc, staleTime: 5 * 60_000, refetchInterval: false });
   return (
     <Dialog open={!!doc} onOpenChange={(o) => !o && onClose()}>
       {doc && (

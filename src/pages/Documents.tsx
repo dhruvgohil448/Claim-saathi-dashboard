@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Segmented } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { EmptyState } from '@/components/ui/empty';
+import { EmptyState, ErrorState } from '@/components/ui/empty';
 import { DocPreview, ValidationPanel } from '@/components/docs';
 
 export default function Documents() {
@@ -22,7 +22,7 @@ export default function Documents() {
   const [status, setStatus] = useState<'ALL' | 'NEEDS_REVIEW' | 'VERIFIED' | 'INVALID'>('ALL');
   const [q, setQ] = useState('');
   const [sel, setSel] = useState<string | null>(null);
-  const { data, isLoading } = useQuery({ queryKey: ['documents'], queryFn: () => api<Doc[]>('/documents'), refetchInterval: 10000 });
+  const { data, isLoading, error, refetch } = useQuery({ queryKey: ['documents'], queryFn: () => api<Doc[]>('/documents') });
   const rows = (data ?? []).filter((d) => (status === 'ALL' || d.status === status) && (!q || `${d.fileName} ${d.claim?.claimNumber} ${d.claim?.patientName}`.toLowerCase().includes(q.toLowerCase())));
   const sorted = [...rows].sort((a, b) => Number(a.status === 'VERIFIED') - Number(b.status === 'VERIFIED'));
   const current = sorted.find((d) => d.id === sel) ?? sorted[0];
@@ -39,7 +39,8 @@ export default function Documents() {
           <div className="border-b border-line p-3"><Input icon={<Search />} placeholder="Search files, claims, patients" value={q} onChange={(e) => setQ(e.target.value)} /></div>
           <div className="flex-1 divide-y divide-line overflow-y-auto scrollbar-thin">
             {isLoading && Array.from({ length: 8 }).map((_, i) => <div key={i} className="p-4"><Skeleton className="h-10 w-full" /></div>)}
-            {!isLoading && !sorted.length && <EmptyState icon={<FileText />} title="No documents" />}
+            {error && <ErrorState error={error} onRetry={() => refetch()} />}
+            {!isLoading && !error && !sorted.length && <EmptyState icon={<FileText />} title="No documents" description={data?.length ? 'Nothing matches this filter.' : 'Documents uploaded from the app appear here.'} />}
             {sorted.map((d) => (
               <button key={d.id} onClick={() => setSel(d.id)} className={cn('flex w-full items-center gap-3 px-4 py-3 text-left transition', current?.id === d.id ? 'bg-primary-50/70' : 'hover:bg-[#FAFCFE]')}>
                 <FileText className={cn('size-4 shrink-0', d.status === 'VERIFIED' ? 'text-success' : d.status === 'INVALID' ? 'text-error' : 'text-warning')} />
@@ -67,7 +68,7 @@ export default function Documents() {
               <ValidationPanel doc={current} />
             </div>
           </Card>
-        ) : <Card><EmptyState icon={<FileText />} title="Pick a document" /></Card>}
+        ) : <Card><EmptyState icon={<FileText />} title={data?.length ? 'Pick a document' : 'No documents yet'} /></Card>}
       </div>
     </div>
   );

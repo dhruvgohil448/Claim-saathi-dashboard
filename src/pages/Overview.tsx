@@ -15,15 +15,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar } from '@/components/ui/avatar';
 import { ChartTooltip, KpiCard, Trend } from '@/components/charts';
 import { ActivityRow } from '@/components/activity';
+import { EmptyState, ErrorState } from '@/components/ui/empty';
 
 const shortDay = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 
 export default function Overview() {
   const { user } = useAuth();
-  const ov = useQuery({ queryKey: ['overview'], queryFn: () => api<OV>('/analytics/overview'), refetchInterval: 15000 });
-  const ch = useQuery({ queryKey: ['charts', 14], queryFn: () => api<Charts>('/analytics/charts?days=14'), refetchInterval: 30000 });
+  const ov = useQuery({ queryKey: ['overview'], queryFn: () => api<OV>('/analytics/overview') });
+  const ch = useQuery({ queryKey: ['charts', 14], queryFn: () => api<Charts>('/analytics/charts?days=14') });
   const claims = useQuery({ queryKey: ['claims', 'recent'], queryFn: () => api<ClaimListItem[]>('/claims?limit=6') });
-  const act = useQuery({ queryKey: ['activity', 'recent'], queryFn: () => api<{ items: Activity[] }>('/activity?limit=6&actor=AI'), refetchInterval: 5000 });
+  const act = useQuery({ queryKey: ['activity', 'recent'], queryFn: () => api<{ items: Activity[] }>('/activity?limit=6&actor=AI') });
   const o = ov.data;
   const hour = Number(new Date().toLocaleString('en-IN', { hour: 'numeric', hour12: false, timeZone: 'Asia/Kolkata' }));
   const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
@@ -44,6 +45,7 @@ export default function Overview() {
         }
       />
 
+      {ov.error && <Card className="mb-4"><ErrorState error={ov.error} onRetry={() => ov.refetch()} title="Couldn't load live stats" /></Card>}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard loading={!o} label="Total claims" icon={<FileStack />} value={o?.totalClaims} trend={o && <Trend value={o.claimsTrend} />} foot={o && <span>{o.claimsThisWeek} new this week</span>} />
         <KpiCard loading={!o} label="Auto-handled by AI" tone="success" icon={<Bot />} value={o && `${o.autoHandledPct}%`} trend={o && <Trend value={o.aiActionsTrend} />} foot={<span>AI actions vs last week</span>} />
@@ -55,7 +57,7 @@ export default function Overview() {
         <Card className="xl:col-span-2">
           <CardHeader title="Agent workload" description="Actions per day over the last 14 days" action={<div className="flex items-center gap-4 text-xs text-muted"><span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-primary" />AI</span><span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-navy" />Human</span></div>} />
           <CardBody className="h-[280px] pb-4">
-            {!ch.data ? <Skeleton className="h-full w-full" /> : (
+            {ch.error ? <ErrorState error={ch.error} onRetry={() => ch.refetch()} /> : !ch.data ? <Skeleton className="h-full w-full" /> : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={perDay} margin={{ left: -18, right: 8, top: 8 }} barSize={14}>
                   <CartesianGrid vertical={false} stroke="#EEF2F6" />
@@ -73,7 +75,7 @@ export default function Overview() {
         <Card>
           <CardHeader title="AI vs human" description="Claims handled end to end by the agent" />
           <CardBody>
-            {!o ? <Skeleton className="mx-auto size-48 rounded-full" /> : (
+            {ov.error ? <ErrorState error={ov.error} /> : !o ? <Skeleton className="mx-auto size-48 rounded-full" /> : o.autoHandled + o.escalated === 0 ? <EmptyState icon={<Bot />} title="No decided claims yet" description="This fills in once the agent has handled a claim." /> : (
               <>
                 <div className="relative mx-auto h-[180px] w-[180px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -111,7 +113,7 @@ export default function Overview() {
         <Card>
           <CardHeader title="Claims by status" description="Where every claim is right now" />
           <CardBody className="h-[300px] pb-4">
-            {!ch.data ? <Skeleton className="h-full w-full" /> : (
+            {ch.error ? <ErrorState error={ch.error} /> : !ch.data ? <Skeleton className="h-full w-full" /> : !byStatus.some((s) => s.count > 0) ? <EmptyState icon={<FileStack />} title="No claims yet" /> : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={byStatus} layout="vertical" margin={{ left: 8, right: 16 }} barSize={14}>
                   <CartesianGrid horizontal={false} stroke="#EEF2F6" />
@@ -130,7 +132,9 @@ export default function Overview() {
         <Card className="xl:col-span-2">
           <CardHeader title="Recent claims" description="Latest activity first" action={<Link to="/claims"><Button variant="ghost" size="sm">View all <ArrowRight /></Button></Link>} />
           <div className="divide-y divide-line border-t border-line">
-            {!claims.data && Array.from({ length: 5 }).map((_, i) => <div key={i} className="flex items-center gap-4 px-6 py-3.5"><Skeleton className="size-8 rounded-full" /><Skeleton className="h-4 w-48" /><Skeleton className="ml-auto h-4 w-20" /></div>)}
+            {claims.error && <ErrorState error={claims.error} onRetry={() => claims.refetch()} />}
+            {claims.data && !claims.data.length && <EmptyState icon={<FileStack />} title="No claims yet" description="Claims filed from the mobile app show up here instantly." />}
+            {claims.isLoading && Array.from({ length: 5 }).map((_, i) => <div key={i} className="flex items-center gap-4 px-6 py-3.5"><Skeleton className="size-8 rounded-full" /><Skeleton className="h-4 w-48" /><Skeleton className="ml-auto h-4 w-20" /></div>)}
             {claims.data?.slice(0, 6).map((c) => (
               <Link key={c.id} to={`/claims/${c.claimNumber}`} className="flex items-center gap-4 px-6 py-3 transition-colors hover:bg-[#FAFCFE]">
                 <Avatar name={c.patientName} />
@@ -156,7 +160,9 @@ export default function Overview() {
         <CardHeader title="Latest from the Claim Agent" description="What the AI did most recently" icon={<Sparkles />} action={<Link to="/activity"><Button variant="ghost" size="sm">Open live feed <ArrowRight /></Button></Link>} />
         <div className="divide-y divide-line border-t border-line">
           {act.data?.items.map((a) => <ActivityRow key={a.id} a={a} compact />)}
-          {!act.data && <div className="p-6"><Skeleton className="h-24 w-full" /></div>}
+          {act.data && !act.data.items.length && <EmptyState icon={<Sparkles />} title="No AI actions yet" />}
+          {act.error && <ErrorState error={act.error} onRetry={() => act.refetch()} />}
+          {act.isLoading && <div className="p-6"><Skeleton className="h-24 w-full" /></div>}
         </div>
       </Card>
       {o && o.needsHuman > 0 && (

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Activity, BarChart3, ChevronsLeft, ChevronsRight, FileStack, FileText, LayoutDashboard, MessageSquareText, ShieldCheck, Sparkles, UserRoundCheck, Users, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useLive } from '@/lib/live';
 import { Wordmark } from '@/components/logo';
 import { Tooltip } from '@/components/ui/tooltip';
 import type { Escalation, Overview } from '@/lib/types';
@@ -30,8 +31,9 @@ const groups = [
 ];
 
 export function Sidebar({ collapsed, onToggle, mobileOpen, onCloseMobile }: { collapsed: boolean; onToggle: () => void; mobileOpen: boolean; onCloseMobile: () => void }) {
-  const esc = useQuery({ queryKey: ['escalations'], queryFn: () => api<Escalation[]>('/escalations'), refetchInterval: 15000 });
-  const ov = useQuery({ queryKey: ['overview'], queryFn: () => api<Overview>('/analytics/overview'), refetchInterval: 15000 });
+  const esc = useQuery({ queryKey: ['escalations'], queryFn: () => api<Escalation[]>('/escalations') });
+  const ov = useQuery({ queryKey: ['overview'], queryFn: () => api<Overview>('/analytics/overview') });
+  const live = useLive();
   const counts = { escalations: esc.data?.length, queries: ov.data?.openQueries, docs: ov.data ? (ov.data.documents.NEEDS_REVIEW ?? 0) + (ov.data.documents.INVALID ?? 0) : undefined };
 
   const narrow = collapsed && !mobileOpen;
@@ -78,9 +80,9 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onCloseMobile }: { co
                           <it.icon className={cn('size-[18px] shrink-0', isActive ? 'text-primary-700' : 'text-subtle group-hover:text-muted')} />
                           {!narrow && <span className="flex-1 truncate">{it.label}</span>}
                           {!narrow && 'live' in it && it.live && (
-                            <span className="flex items-center gap-1 rounded-full bg-success-50 px-1.5 py-0.5 text-[10px] font-semibold text-success">
-                              <span className="size-1.5 animate-pulse-ring rounded-full bg-success" />
-                              LIVE
+                            <span title={live.state === 'live' ? 'Connected: updates are pushed instantly' : 'Stream offline: refreshing every 5 s'} className={cn('flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold', live.state === 'live' ? 'bg-success-50 text-success' : 'bg-warning-50 text-[#A86500]')}>
+                              <span className={cn('size-1.5 rounded-full', live.state === 'live' ? 'animate-pulse-ring bg-success' : 'bg-warning')} />
+                              {live.state === 'live' ? 'LIVE' : 'SYNC'}
                             </span>
                           )}
                           {!narrow && !!count && (
@@ -104,7 +106,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onCloseMobile }: { co
               <Activity className="size-4 text-primary" /> Claim Agent
             </div>
             <p className="mt-1.5 text-[12px] leading-relaxed text-white/70">
-              {ov.data ? `Auto-handled ${ov.data.autoHandledPct}% of claims. Avg confidence ${Math.round(ov.data.avgConfidence * 100)}%.` : 'Watching every claim, document and query.'}
+              {ov.data ? `Auto-handled ${ov.data.autoHandledPct}% of claims. Avg confidence ${Math.round(ov.data.avgConfidence * 100)}%.` : ov.error ? 'Agent stats unavailable right now.' : 'Loading agent stats…'}
             </p>
             <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/15">
               <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${ov.data?.autoHandledPct ?? 0}%` }} />

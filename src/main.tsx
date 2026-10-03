@@ -5,10 +5,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider } from '@/lib/auth';
+import { pollInterval } from '@/lib/live';
 import App from './App';
 import './index.css';
 
-const qc = new QueryClient({ defaultOptions: { queries: { staleTime: 10_000, retry: (n, e: unknown) => n < 1 && !(e as { status?: number })?.status, refetchOnWindowFocus: false } } });
+// Every query refetches on a live interval: 30 s while the SSE stream is connected (pushes do the real work), 5 s when it is not.
+const qc = new QueryClient({ defaultOptions: { queries: { staleTime: 2_000, retry: (n, e: unknown) => n < 1 && !(e as { status?: number })?.status, refetchOnWindowFocus: true, refetchInterval: () => pollInterval() } } });
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

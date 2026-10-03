@@ -12,7 +12,7 @@ import { Badge, ConfidencePill, StatusBadge } from '@/components/ui/badge';
 import { Input, Select } from '@/components/ui/input';
 import { Segmented } from '@/components/ui/tabs';
 import { TableSkeleton } from '@/components/ui/skeleton';
-import { EmptyState } from '@/components/ui/empty';
+import { EmptyState, ErrorState } from '@/components/ui/empty';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 
@@ -22,7 +22,7 @@ export default function Claims() {
   const [search, setSearch] = useState(sp.get('q') ?? '');
   const status = (sp.get('status') ?? 'ALL') as ClaimStatus | 'ALL';
   const type = sp.get('type') ?? 'ALL';
-  const all = useQuery({ queryKey: ['claims', 'all'], queryFn: () => api<ClaimListItem[]>('/claims?limit=200'), refetchInterval: 15000 });
+  const all = useQuery({ queryKey: ['claims', 'all'], queryFn: () => api<ClaimListItem[]>('/claims?limit=200') });
   const set = (k: string, v: string) => {
     const n = new URLSearchParams(sp);
     if (v === 'ALL' || !v) n.delete(k);
@@ -53,7 +53,9 @@ export default function Claims() {
           <div className="text-[13px] text-muted lg:ml-auto">{rows.length} of {all.data?.length ?? '…'} claims</div>
         </div>
 
-        {all.isLoading ? <TableSkeleton rows={8} cols={6} /> : !rows.length ? (
+        {all.error ? <ErrorState error={all.error} onRetry={() => all.refetch()} /> : all.isLoading ? <TableSkeleton rows={8} cols={6} /> : !all.data?.length ? (
+          <EmptyState icon={<FileStack />} title="No claims yet" description="Claims filed from the Claim Saathi app appear here as soon as they are submitted." />
+        ) : !rows.length ? (
           <EmptyState icon={<FileStack />} title="No claims match" description="Try a different search or clear the filters." action={<Button variant="outline" onClick={() => (setSearch(''), setSp({}))}>Clear filters</Button>} />
         ) : (
           <div className="overflow-x-auto">

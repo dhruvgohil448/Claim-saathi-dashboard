@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { Loader2, WifiOff } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth';
+import { startLive, stopLive } from '@/lib/live';
 import { API_URL, onServerStatus } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Sidebar } from './Sidebar';
@@ -33,6 +35,12 @@ export function AppLayout() {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('cs_sidebar') === '1');
   const [mobile, setMobile] = useState(false);
   useEffect(() => localStorage.setItem('cs_sidebar', collapsed ? '1' : '0'), [collapsed]);
+  const qc = useQueryClient();
+  useEffect(() => {
+    if (!user) return;
+    startLive(qc);
+    return stopLive;
+  }, [user?.id, qc]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!ready)
     return (
