@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, CheckCheck, FileStack, LogOut, Menu, RotateCcw, Search, ShieldCheck, User as UserIcon } from 'lucide-react';
+import { Bell, CheckCheck, Database, FileStack, LogOut, Menu, RotateCcw, Search, ShieldCheck, User as UserIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -126,6 +126,41 @@ function Notifications() {
   );
 }
 
+interface DemoCfg { showDemoData: boolean; demoClaims: number; liveClaims: number }
+
+/** Global (server-side) switch: hides seeded sample claims from every dashboard view when off. */
+function DemoToggle() {
+  const qc = useQueryClient();
+  const { data } = useQuery({ queryKey: ['demo-config'], queryFn: () => api<DemoCfg>('/config/demo') });
+  const m = useMutation({
+    mutationFn: (v: boolean) => api<{ showDemoData: boolean }>('/config/demo', { method: 'PUT', json: { showDemoData: v } }),
+    onMutate: (v) => qc.setQueryData<DemoCfg>(['demo-config'], (d) => (d ? { ...d, showDemoData: v } : d)),
+    onSuccess: (r) => (qc.invalidateQueries(), toast.success(r.showDemoData ? 'Demo data shown' : 'Demo data hidden', { description: r.showDemoData ? 'Seeded sample claims are back in every view.' : 'Showing live app data only, on every open dashboard.' })),
+    onError: (e: Error) => (qc.invalidateQueries({ queryKey: ['demo-config'] }), toast.error(e.message)),
+  });
+  if (!data) return null;
+  const on = data.showDemoData;
+  return (
+    <div className="flex items-center gap-2">
+      {!on && <span className="hidden rounded-full bg-warning-50 px-2.5 py-1 text-[11px] font-semibold text-[#9a5b00] ring-1 ring-warning/30 md:inline">Showing live app data only</span>}
+      <button
+        role="switch"
+        aria-checked={on}
+        disabled={m.isPending}
+        onClick={() => m.mutate(!on)}
+        title={`${data.demoClaims} demo / ${data.liveClaims} live claims`}
+        className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-[13px] font-medium text-muted transition hover:bg-[#F1F4F8] hover:text-ink disabled:opacity-60"
+      >
+        <Database className="size-4" />
+        <span className="hidden sm:inline">Demo data</span>
+        <span className={cn('relative h-5 w-9 rounded-full transition', on ? 'bg-primary' : 'bg-line-strong')}>
+          <span className={cn('absolute top-0.5 size-4 rounded-full bg-white shadow transition-all', on ? 'left-[18px]' : 'left-0.5')} />
+        </span>
+      </button>
+    </div>
+  );
+}
+
 export function Topbar({ onMenu }: { onMenu: () => void }) {
   const { user, logout } = useAuth();
   const qc = useQueryClient();
@@ -141,6 +176,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
       </button>
       <GlobalSearch />
       <div className="ml-auto flex items-center gap-1.5">
+        <DemoToggle />
         <Notifications />
         <div className="mx-1.5 h-6 w-px bg-line" />
         <Dropdown>
