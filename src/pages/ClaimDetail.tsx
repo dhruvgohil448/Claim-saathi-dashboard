@@ -17,6 +17,7 @@ import { Dropdown, DropdownContent, DropdownItem, DropdownTrigger } from '@/comp
 import { DecisionDialog, QueryDialog, useDecision } from '@/components/decision';
 import { DocPreviewDialog } from '@/components/docs';
 import { ActivityRow } from '@/components/activity';
+import { CopilotPanel } from '@/components/copilot';
 
 const suggestionLabel: Record<string, string> = { APPROVE: 'Approve in full', PARTIAL_APPROVE: 'Partial approval', REJECT: 'Reject', REQUEST_INFO: 'Ask for more info', APPROVE_PREAUTH: 'Approve pre-auth' };
 
@@ -134,6 +135,9 @@ export default function ClaimDetail() {
               )}
             </CardBody>
           </Card>
+
+          {/* AI Copilot */}
+          <CopilotPanel claimId={c.id} canDecide={canDecide} onApprove={() => setDlg('APPROVE')} onQuery={() => setDlg('QUERY')} />
 
           {/* Documents */}
           <Card>
